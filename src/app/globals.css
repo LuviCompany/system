@@ -1,0 +1,197 @@
+@import "tailwindcss";
+
+/*
+ * LUVI Design System — design tokens (Dark Premium)
+ *
+ * Identidade oficial: preto + grafite + branco, com laranja #FF3B00 como
+ * ÚNICA cor de marca/ação, usado com moderação (CTA, ativo, foco, destaques).
+ * Esta é a fonte única da paleta — qualquer ajuste de cor é feito só aqui.
+ * Tailwind v4 lê este bloco @theme e gera as utilities
+ * (bg-brand-500, text-ink-500, bg-canvas, border-border, shadow-popover...).
+ *
+ * Mapa de papéis semânticos usados pelos componentes:
+ *   --color-canvas          fundo da aplicação (body, shell do dashboard, login)
+ *   --color-well            fundo "recuado" (trilho do Kanban, trilho de Tabs, campo de formulário)
+ *   --color-surface         cards, modais, drawers, dropdowns, tabela — a "superfície" padrão
+ *   --color-surface-subtle  hover/estado elevado sobre uma surface (mais claro, não mais escuro)
+ *   --color-surface-sunken  idem, usado nos mesmos casos por herança de nomes anteriores
+ *   --color-border          toda borda da aplicação
+ *   --color-ink-900          texto principal (branco)
+ *   --color-ink-500          texto secundário (cinza — valor oficial do briefing)
+ */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* Brand oficial LUVI — #FF3B00. CTA, ativo, foco, seleção, progresso,
+     pequenos detalhes de marca. NUNCA como cor de fundo extensa. */
+  /* 50/100 = fundo escuro e sutil para chips/badges de marca (não claro — este
+     é um sistema dark). 200-400 = tons mais claros/vivos, para texto/ícone
+     sobre esses chips. */
+  --color-brand-50: hsl(14, 55%, 11%);
+  --color-brand-100: hsl(14, 60%, 16%);
+  --color-brand-200: hsl(15, 70%, 28%);
+  --color-brand-300: hsl(15, 85%, 42%);
+  --color-brand-400: hsl(16, 100%, 58%);
+  --color-brand-500: #ff3b00;
+  --color-brand-600: hsl(14, 100%, 45%);
+  --color-brand-700: hsl(13, 95%, 38%);
+  --color-brand-800: hsl(12, 88%, 31%);
+  --color-brand-900: hsl(11, 82%, 25%);
+  --color-brand-950: hsl(10, 78%, 15%);
+
+  /* Escala de texto/ícones — do branco (900) ao quase-invisível (50). */
+  --color-ink-950: #000000;
+  --color-ink-900: #ffffff;
+  --color-ink-800: #f2f2f2;
+  --color-ink-700: #d4d4d4;
+  --color-ink-600: #b5b5b5;
+  --color-ink-500: #a3a3a3;
+  --color-ink-400: #737373;
+  --color-ink-300: #525252;
+  --color-ink-200: #3a3a3a;
+  --color-ink-100: #262626;
+  --color-ink-50: #1a1a1a;
+
+  /* Semânticas — fundo do badge escuro e sutil, texto/ícone vibrante e legível. */
+  --color-success-50: #10261a;
+  --color-success-500: #22c55e;
+  --color-success-600: #4ade80;
+  --color-warning-50: #2b2008;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #fbbf24;
+  --color-danger-50: #2b1212;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #f87171;
+  /* "info" é neutro por decisão de marca (briefing pede para não usar azul/roxo
+     como identidade) — mesmo tom do texto, apenas com um fundo destacável. */
+  --color-info-50: #1f1f1f;
+  --color-info-500: #d4d4d4;
+  --color-info-600: #e5e5e5;
+
+  /* Fundo da aplicação e superfícies — preto + grafite. */
+  --color-canvas: #0b0b0b;
+  --color-well: #111111;
+  --color-surface: #171717;
+  --color-surface-subtle: #1d1d1d;
+  --color-surface-sunken: #1d1d1d;
+  --color-border: #2a2a2a;
+  --color-border-strong: #2a2a2a;
+
+  /* Sidebar — mesma base do canvas, com o próprio grafite para hover/ativo. */
+  --color-chrome-bg: #0b0b0b;
+  --color-chrome-bg-elevated: #171717;
+  --color-chrome-border: #2a2a2a;
+  --color-chrome-fg: #ffffff;
+  --color-chrome-fg-muted: #a3a3a3;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Sombras discretas — em dark UI, profundidade vem de borda + contraste de
+     superfície, não de sombra pesada. Popover ainda precisa de uma sombra
+     real para se separar de conteúdo escuro atrás dele. */
+  --shadow-card: none;
+  --shadow-card-hover: 0 0 0 1px var(--color-border-strong);
+  --shadow-popover: 0 8px 24px 0 rgb(0 0 0 / 0.55), 0 2px 8px 0 rgb(0 0 0 / 0.4);
+}
+
+/*
+ * Tema Claro — sobrescreve as mesmas custom properties do bloco @theme acima
+ * quando `<html data-theme="light">`. Não é o dark invertido: a escala de
+ * texto, os fundos de chip de marca/semânticos e o contraste foram recalculados
+ * para funcionar sobre fundo claro (ver ARCHITECTURE.md, seção "Tema Claro").
+ * `data-theme` é definido no servidor (RootLayout, a partir de um cookie —
+ * server/theme/theme.service.ts) para não haver flash de tema errado.
+ */
+:root[data-theme="light"] {
+  --color-brand-50: hsl(14, 100%, 96%);
+  --color-brand-100: hsl(14, 92%, 90%);
+  --color-brand-200: hsl(15, 88%, 78%);
+  --color-brand-300: hsl(15, 85%, 60%);
+  --color-brand-400: hsl(15, 88%, 45%);
+  /* 500 (#ff3b00) e 600-950 permanecem os mesmos do tema escuro — são usados
+     como fundo de botão preenchido/hover, saturados o bastante para
+     funcionar sobre qualquer fundo. */
+
+  --color-ink-950: #000000;
+  --color-ink-900: #111111;
+  --color-ink-800: #262626;
+  --color-ink-700: #3f3f3f;
+  --color-ink-600: #525252;
+  --color-ink-500: #666666;
+  --color-ink-400: #8a8a8a;
+  --color-ink-300: #b3b3b3;
+  --color-ink-200: #d4d4d4;
+  --color-ink-100: #e5e5e5;
+  --color-ink-50: #f2f2f2;
+
+  --color-success-50: #e8f8ee;
+  --color-success-500: #16a34a;
+  --color-success-600: #15803d;
+  --color-warning-50: #fdf0e1;
+  --color-warning-500: #b45309;
+  --color-warning-600: #92400e;
+  --color-danger-50: #fdecec;
+  --color-danger-500: #dc2626;
+  --color-danger-600: #b91c1c;
+  --color-info-50: #f2f2f2;
+  --color-info-500: #525252;
+  --color-info-600: #404040;
+
+  --color-canvas: #f7f7f7;
+  --color-well: #f2f2f2;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f2f2f2;
+  --color-surface-sunken: #eaeaea;
+  --color-border: #e5e5e5;
+  --color-border-strong: #d4d4d4;
+
+  --color-chrome-bg: #f7f7f7;
+  --color-chrome-bg-elevated: #ffffff;
+  --color-chrome-border: #e5e5e5;
+  --color-chrome-fg: #111111;
+  --color-chrome-fg-muted: #666666;
+
+  /* Em fundo claro a profundidade vem de sombra real, não só de borda. */
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-card-hover: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 0 0 1px var(--color-border-strong);
+  --shadow-popover: 0 8px 24px 0 rgb(0 0 0 / 0.12), 0 2px 8px 0 rgb(0 0 0 / 0.08);
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink-900);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-brand-900);
+  color: var(--color-ink-900);
+}
+
+/*
+ * Transição sutil entre temas — só cor/fundo/borda, nunca layout ou transform.
+ * Especificidade zero (seletor universal) de propósito: qualquer utilitário
+ * Tailwind mais específico (transition-transform, transition-all de um
+ * dropdown/accordion, etc.) continua no comando normalmente.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  *,
+  *::before,
+  *::after {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+  }
+}

@@ -1,0 +1,543 @@
+// LUVI CRM — schema multi-tenant
+//
+// DECISÃO DE ARQUITETURA (registrada em ARCHITECTURE.md): o produto pivotou
+// de "LUVI Intelligence" (dashboard de métricas de mídia paga dos clientes da
+// agência) para "LUVI CRM" (ferramenta de prospecção e vendas para o time
+// comercial da própria Luvi Company). As entidades antigas de mídia paga
+// (Client/Connection/Campaign/Metric/Report/Insight) foram substituídas pelas
+// entidades de CRM abaixo, centradas em Lead.
+//
+// Toda entidade de negócio pertence a uma Organization e é sempre filtrada
+// por organizationId nas queries da aplicação (isolamento multi-tenant).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  GESTOR
+  VENDEDOR
+}
+
+enum LeadSource {
+  GOOGLE_MAPS
+  GOOGLE_PLACES
+  INSTAGRAM
+  LINKEDIN
+  INDICACAO
+  SITE
+  EVENTO
+  IMPORTACAO_CSV
+  BUSCA_EXTERNA
+  OUTRO
+}
+
+enum PipelineStage {
+  NOVOS
+  QUALIFICADOS
+  PROSPECCAO
+  CONTATO
+  REUNIAO
+  PROPOSTA
+  NEGOCIACAO
+  GANHO
+  PERDIDO
+}
+
+enum ActivityType {
+  LIGACAO
+  WHATSAPP
+  EMAIL
+  INSTAGRAM
+  REUNIAO
+  NOTA
+  FOLLOW_UP
+  PROPOSTA
+}
+
+enum FollowUpStatus {
+  PENDENTE
+  CONCLUIDO
+}
+
+/// Dimensões avaliadas pelo motor de pontuação de ICP. Cada uma vira um
+/// IcpProfileCriterion (com peso) dentro de um IcpProfile.
+enum IcpCriterionType {
+  SEGMENTO
+  FATURAMENTO
+  TICKET
+  LOCALIZACAO
+  SITE
+  INSTAGRAM
+  INVESTIMENTO_TRAFEGO
+  MATURIDADE_COMERCIAL
+  NECESSIDADE_MARKETING
+  NECESSIDADE_TECNOLOGIA
+  POTENCIAL_RECORRENCIA
+}
+
+enum LeadPriority {
+  BAIXA
+  MEDIA
+  ALTA
+  MAXIMA
+}
+
+/// Status de um LeadSearchResult em relação ao CRM: ainda não existe (NEW),
+/// já existe um Lead com os mesmos dados (DUPLICATE), ou já foi adicionado
+/// (IMPORTED).
+enum LeadSearchResultStatus {
+  NEW
+  DUPLICATE
+  IMPORTED
+}
+
+/// Campos que o motor de enriquecimento (server/lead-sourcing) pode preencher
+/// num Lead. Ver LeadEnrichment.
+enum EnrichmentField {
+  WEBSITE
+  INSTAGRAM
+  LINKEDIN
+  PHONE
+  EMAIL
+  SEGMENT
+  CITY
+  STATE
+  EMPLOYEES
+  REVENUE_ESTIMATE
+  AD_ACTIVITY
+  DIGITAL_PRESENCE
+  TECHNOLOGY_STACK
+  RATING
+  USER_RATING_COUNT
+}
+
+enum EnrichmentStatus {
+  FOUND
+  NOT_FOUND
+  PENDING
+}
+
+/// Tenant raiz. Todo dado comercial referencia uma Organization.
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  domain    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  leads             Lead[]
+  tags              Tag[]
+  icpProfiles       IcpProfile[]
+  leadScores        LeadScore[]
+  activities        Activity[]
+  followUps         FollowUp[]
+  stageEvents       PipelineStageEvent[]
+  leadSearchQueries LeadSearchQuery[]
+  leadSearchResults LeadSearchResult[]
+  leadEnrichments   LeadEnrichment[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  email          String   @unique
+  passwordHash   String
+  role           UserRole @default(VENDEDOR)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization      Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leadsResponsavel  Lead[]               @relation("LeadResponsavel")
+  activities        Activity[]
+  followUps         FollowUp[]
+  stageEvents       PipelineStageEvent[]
+  leadSearchQueries LeadSearchQuery[]
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+/// Empresa/lead prospectado pelo time comercial da Luvi.
+model Lead {
+  id             String  @id @default(cuid())
+  organizationId String
+  responsavelId  String?
+
+  company        String
+  contactName    String?
+  position       String?
+  cnpj           String?
+  phone          String?
+  whatsapp       String?
+  email          String?
+  website        String?
+  instagram      String?
+  linkedin       String?
+  city           String?
+  state          String?
+  segment        String?
+  source         LeadSource    @default(OUTRO)
+  potentialValue Decimal?      @db.Decimal(12, 2)
+  notes          String?
+  stage          PipelineStage @default(NOVOS)
+
+  /// Referência à fonte externa que originou o lead (ex: Google Places).
+  /// externalId = placeId; sourceUrl = link direto na fonte (ex: Google Maps).
+  externalId String?
+  sourceUrl  String?
+
+  /// Dados usados pelo motor de pontuação de ICP (server/icp/scoring.ts).
+  /// Todos opcionais: um lead sem esses dados ainda pode ser salvo, apenas
+  /// contribui 0 para os critérios correspondentes ao calcular o score.
+  estimatedRevenue    Decimal? @db.Decimal(14, 2) // FATURAMENTO estimado (mensal)
+  adSpend             Decimal? @db.Decimal(12, 2) // INVESTIMENTO EM TRÁFEGO (mensal)
+  commercialMaturity  Int? // MATURIDADE COMERCIAL, 0-100
+  marketingNeed       Int? // NECESSIDADE DE MARKETING, 0-100
+  technologyNeed      Int? // NECESSIDADE DE TECNOLOGIA, 0-100
+  recurrencePotential Int? // POTENCIAL DE RECORRÊNCIA, 0-100
+
+  /// Resultado mais recente do motor de pontuação — denormalizado no Lead
+  /// para permitir ordenar/filtrar sem juntar LeadScore. O detalhamento por
+  /// critério fica em LeadScore/LeadScoreFactor.
+  icpScore Int          @default(0)
+  priority LeadPriority @default(BAIXA)
+
+  nextFollowUpAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsavel  User?                @relation("LeadResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  tags         LeadTag[]
+  activities   Activity[]
+  followUps    FollowUp[]
+  stageEvents  PipelineStageEvent[]
+  score        LeadScore?
+  enrichments  LeadEnrichment[]
+
+  @@index([organizationId])
+  @@index([organizationId, stage])
+  @@index([organizationId, priority])
+  @@index([organizationId, icpScore])
+  @@index([organizationId, externalId])
+  @@index([responsavelId])
+  @@map("leads")
+}
+
+model Tag {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  color          String   @default("#71717e")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leads        LeadTag[]
+
+  @@unique([organizationId, name])
+  @@map("tags")
+}
+
+/// Tabela de junção explícita (em vez de m-n implícito) para permitir índices próprios.
+model LeadTag {
+  leadId String
+  tagId  String
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+  @@index([tagId])
+  @@map("lead_tags")
+}
+
+/// Perfil de Cliente Ideal: um conjunto de critérios com peso, usado pelo
+/// motor de pontuação (server/icp/scoring.ts) para calcular o icpScore de
+/// cada lead. Apenas um perfil por organização fica `isActive` por vez — é
+/// esse que é usado para pontuar. Perfis inativos ficam guardados (histórico
+/// de configuração), sem serem recalculados.
+model IcpProfile {
+  id             String @id @default(cuid())
+  organizationId String
+
+  name        String
+  description String?
+  isActive    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  criteria     IcpProfileCriterion[]
+  scores       LeadScore[]
+
+  @@index([organizationId])
+  @@index([organizationId, isActive])
+  @@map("icp_profiles")
+}
+
+/// Um critério dentro de um perfil de ICP, com seu peso (0-100).
+model IcpProfileCriterion {
+  id           String @id @default(cuid())
+  icpProfileId String
+
+  type   IcpCriterionType
+  weight Int              @default(0) // 0-100
+
+  icpProfile IcpProfile                @relation(fields: [icpProfileId], references: [id], onDelete: Cascade)
+  rules      IcpProfileCriterionRule[]
+
+  @@unique([icpProfileId, type])
+  @@map("icp_profile_criteria")
+}
+
+/// Faixa de pontuação de um critério. Para critérios numéricos (faturamento,
+/// ticket, investimento, e as 4 dimensões 0-100), o lead cai na primeira
+/// regra cujo [minValue, maxValue] contenha o valor do lead. Para critérios
+/// categóricos (segmento, localização), `matchValues` é comparado (case
+/// insensitive) com o valor do lead. SITE/INSTAGRAM não usam regras — são
+/// avaliados por presença/ausência do campo no lead.
+model IcpProfileCriterionRule {
+  id          String @id @default(cuid())
+  criterionId String
+
+  label       String // rótulo exibido, ex: "Até R$ 50 mil"
+  order       Int      @default(0)
+  minValue    Decimal? @db.Decimal(14, 2)
+  maxValue    Decimal? @db.Decimal(14, 2)
+  matchValues String[] @default([])
+  score       Int      @default(0) // 0-100
+
+  criterion IcpProfileCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@index([criterionId])
+  @@map("icp_profile_criterion_rules")
+}
+
+/// Resultado mais recente do cálculo de ICP Score de um lead — um por lead,
+/// recalculado (sobrescrito) a cada mudança relevante no lead ou no perfil.
+model LeadScore {
+  id             String @id @default(cuid())
+  organizationId String
+  leadId         String @unique
+  icpProfileId   String
+
+  score        Int          @default(0)
+  priority     LeadPriority @default(BAIXA)
+  calculatedAt DateTime     @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  icpProfile   IcpProfile        @relation(fields: [icpProfileId], references: [id], onDelete: Cascade)
+  factors      LeadScoreFactor[]
+
+  @@index([organizationId])
+  @@map("lead_scores")
+}
+
+/// Um fator individual que compôs o LeadScore — usado para explicar "por que
+/// este lead recebeu X pontos?" no detalhe do lead.
+model LeadScoreFactor {
+  id          String @id @default(cuid())
+  leadScoreId String
+
+  type         IcpCriterionType
+  label        String // rótulo humano do critério, ex: "Faturamento"
+  weight       Int // peso do critério no momento do cálculo
+  rawScore     Int // 0-100, pontuação da faixa/regra que o lead atingiu
+  contribution Int // pontos que este fator contribuiu para o score final (0-100)
+
+  leadScore LeadScore @relation(fields: [leadScoreId], references: [id], onDelete: Cascade)
+
+  @@index([leadScoreId])
+  @@map("lead_score_factors")
+}
+
+/// Linha do histórico/timeline de um lead (ligação, whatsapp, nota, reunião...).
+model Activity {
+  id             String @id @default(cuid())
+  organizationId String
+  leadId         String
+  userId         String
+
+  type        ActivityType
+  description String
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@map("activities")
+}
+
+model FollowUp {
+  id             String @id @default(cuid())
+  organizationId String
+  leadId         String
+  responsavelId  String
+
+  scheduledAt DateTime
+  note        String?
+  status      FollowUpStatus @default(PENDENTE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  responsavel  User         @relation(fields: [responsavelId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@index([organizationId, scheduledAt])
+  @@map("follow_ups")
+}
+
+/// Histórico de movimentação do lead entre etapas do pipeline (auditoria/timeline).
+model PipelineStageEvent {
+  id             String @id @default(cuid())
+  organizationId String
+  leadId         String
+  userId         String
+
+  fromStage PipelineStage?
+  toStage   PipelineStage
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@map("pipeline_stage_events")
+}
+
+/// Registro de auditoria de uma execução de busca em "Encontrar Leads"
+/// (server/lead-sourcing). Guarda os parâmetros usados e os totais — os dados
+/// das empresas candidatas em si ficam em LeadSearchResult.
+model LeadSearchQuery {
+  id             String @id @default(cuid())
+  organizationId String
+  userId         String
+
+  provider     String // id do SearchProvider usado, ex: "mock"
+  segment      String?
+  city         String?
+  state        String?
+  keyword      String?
+  icpProfileId String?
+
+  requestedQuantity Int
+  resultCount       Int @default(0)
+  addedCount        Int @default(0)
+  duplicateCount    Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  results      LeadSearchResult[]
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@map("lead_search_queries")
+}
+
+/// Uma empresa candidata devolvida pelo provider (mock hoje; uma fonte externa
+/// real futuramente) numa busca específica — já normalizada e pontuada pelo
+/// motor de ICP (server/icp/scoring.ts), mas fora do CRM até o usuário confirmar
+/// "Adicionar ao CRM".
+model LeadSearchResult {
+  id             String @id @default(cuid())
+  organizationId String
+  searchQueryId  String
+  externalId     String // id do provider (ex: "mock-014") — usado para idempotência
+
+  company         String
+  segment         String?
+  type            String? // categoria crua da fonte (ex: primaryType do Google Places — "dentist")
+  address         String? // endereço completo formatado, quando a fonte devolve (ex: formattedAddress)
+  city            String?
+  state           String?
+  phone           String?
+  website         String?
+  instagram       String?
+  linkedin        String?
+  email           String?
+  cnpj            String?
+  sourceUrl       String? // link direto na fonte (ex: googleMapsUri) — só após enriquecimento
+  rating          Float?
+  userRatingCount Int?
+
+  potentialValue      Decimal? @db.Decimal(12, 2)
+  estimatedRevenue    Decimal? @db.Decimal(14, 2)
+  adSpend             Decimal? @db.Decimal(12, 2)
+  commercialMaturity  Int?
+  marketingNeed       Int?
+  technologyNeed      Int?
+  recurrencePotential Int?
+
+  /// Dados de enriquecimento sem coluna própria (ex: employees, technologyStack)
+  /// — nunca inventados, apenas o que o provider realmente devolveu.
+  raw Json?
+
+  icpScore     Int          @default(0)
+  priority     LeadPriority @default(BAIXA)
+  scoreFactors Json? // ScoreFactorResult[] — explica o score antes de virar Lead
+
+  status        LeadSearchResultStatus @default(NEW)
+  matchedLeadId String? // preenchido quando é duplicado de um Lead existente, ou após o import
+
+  createdAt DateTime @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  searchQuery  LeadSearchQuery @relation(fields: [searchQueryId], references: [id], onDelete: Cascade)
+
+  @@unique([searchQueryId, externalId])
+  @@index([organizationId])
+  @@index([searchQueryId])
+  @@map("lead_search_results")
+}
+
+/// Status de enriquecimento por campo de um lead já no CRM — preparado para
+/// auditoria futura (server/lead-sourcing). FOUND só quando o provider
+/// realmente encontrou o valor; nunca preenchido com dado inventado.
+model LeadEnrichment {
+  id             String @id @default(cuid())
+  organizationId String
+  leadId         String
+
+  field  EnrichmentField
+  value  String?
+  status EnrichmentStatus @default(PENDING)
+  source String? // ex: "mock_provider"
+
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, field])
+  @@index([organizationId])
+  @@map("lead_enrichments")
+}
