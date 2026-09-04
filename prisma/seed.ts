@@ -5,6 +5,7 @@ import { hashPassword } from "../src/server/auth/password";
 import { DEFAULT_TAGS } from "../src/modules/leads/constants";
 import { DEFAULT_RULE_TEMPLATES } from "../src/modules/icp/constants";
 import { activateIcpProfile, createIcpProfile, type IcpProfileInput } from "../src/server/icp/icp.service";
+import { seedClientes } from "./seed-clientes";
 
 const prisma = new PrismaClient();
 
@@ -363,6 +364,8 @@ async function main() {
       console.log("  Perfil de ICP ativo recalculado para todos os leads.");
     }
   }
+
+  await seedClientes(organization.id, vendedores);
 
   console.log("Seed do LUVI CRM concluído:");
   console.log(`  Organização: ${organization.name} (${organization.slug})`);

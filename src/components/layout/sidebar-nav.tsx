@@ -23,6 +23,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
       <nav aria-label="Navegação principal" className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
         {navSections.map((section, index) => (
           <div key={section.label ?? `section-${index}`}>
+            {section.separatorBefore && <hr className="mx-3 mb-4 border-t border-chrome-border" />}
             {section.label && (
               <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-chrome-fg-muted">
                 {section.label}

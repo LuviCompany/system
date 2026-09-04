@@ -145,6 +145,16 @@ model Organization {
   leadSearchResults LeadSearchResult[]
   leadEnrichments   LeadEnrichment[]
 
+  // LUVI CLIENTES — gestão e relatórios de performance dos clientes da agência.
+  clients            Client[]
+  clientPlatforms    ClientPlatform[]
+  campaigns          Campaign[]
+  ads                Ad[]
+  performanceMetrics PerformanceMetric[]
+  socialPosts        SocialPost[]
+  socialEngagements  SocialEngagement[]
+  reports            Report[]
+
   @@map("organizations")
 }
 
@@ -159,12 +169,13 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization      Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  leadsResponsavel  Lead[]               @relation("LeadResponsavel")
-  activities        Activity[]
-  followUps         FollowUp[]
-  stageEvents       PipelineStageEvent[]
-  leadSearchQueries LeadSearchQuery[]
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leadsResponsavel   Lead[]               @relation("LeadResponsavel")
+  activities         Activity[]
+  followUps          FollowUp[]
+  stageEvents        PipelineStageEvent[]
+  leadSearchQueries  LeadSearchQuery[]
+  clientsResponsavel Client[]             @relation("ClientResponsavel")
 
   @@index([organizationId])
   @@map("users")
@@ -540,4 +551,320 @@ model LeadEnrichment {
   @@unique([leadId, field])
   @@index([organizationId])
   @@map("lead_enrichments")
+}
+
+// =====================================================================
+// LUVI CLIENTES — gestão e relatórios de performance dos clientes da
+// agência (Meta Ads, Google Ads, Social Media). Nesta etapa toda métrica
+// é alimentada por dados MOCK (ver prisma/seed.ts); a arquitetura já fica
+// pronta para receber sincronizações reais das plataformas no lugar do
+// mock, sem mudança de schema — os campos são os mesmos que uma API real
+// devolveria. Todas as entidades pertencem a uma Organization.
+// =====================================================================
+
+enum ClientStatus {
+  ATIVO
+  PAUSADO
+  ENCERRADO
+}
+
+/// Saúde de performance do cliente, derivada do ROAS/tendência recente —
+/// exibida como "Status" na tabela de clientes (Saudável/Atenção/Crítico).
+enum ClientHealthStatus {
+  SAUDAVEL
+  ATENCAO
+  CRITICO
+}
+
+/// Plataformas com card de conexão em /clientes/[id]/integracoes.
+enum IntegrationPlatform {
+  META_ADS
+  GOOGLE_ADS
+  INSTAGRAM
+  GOOGLE_ANALYTICS
+}
+
+enum IntegrationStatus {
+  NAO_CONECTADO
+  CONECTADO
+}
+
+/// Plataforma de mídia paga de uma campanha/anúncio/métrica.
+enum AdPlatform {
+  META_ADS
+  GOOGLE_ADS
+}
+
+enum CampaignStatus {
+  ATIVA
+  PAUSADA
+  ENCERRADA
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  LINKEDIN
+}
+
+enum SocialContentType {
+  IMAGEM
+  VIDEO
+  CARROSSEL
+  REELS
+  STORY
+}
+
+enum ReportStatus {
+  RASCUNHO
+  PRONTO
+}
+
+/// Empresa cliente da agência (contas de mídia paga + social media).
+/// Distinto de Lead (prospecção comercial da própria Luvi).
+model Client {
+  id             String  @id @default(cuid())
+  organizationId String
+  responsavelId  String?
+
+  name      String
+  tradeName String?
+  cnpj      String?
+  website   String?
+  instagram String?
+  segment   String?
+  email     String?
+  phone     String?
+  status    ClientStatus       @default(ATIVO)
+  health    ClientHealthStatus @default(SAUDAVEL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsavel  User?               @relation("ClientResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  platforms    ClientPlatform[]
+  campaigns    Campaign[]
+  ads          Ad[]
+  metrics      PerformanceMetric[]
+  socialPosts  SocialPost[]
+  reports      Report[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@map("clients")
+}
+
+/// Status de conexão de um cliente com uma plataforma (Meta Ads, Google
+/// Ads, Instagram, Google Analytics). Nesta etapa não há OAuth real — só
+/// a interface e o dado de status ficam prontos.
+model ClientPlatform {
+  id             String @id @default(cuid())
+  organizationId String
+  clientId       String
+
+  platform     IntegrationPlatform
+  status       IntegrationStatus   @default(NAO_CONECTADO)
+  accountLabel String?
+  connectedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, platform])
+  @@index([organizationId])
+  @@map("client_platforms")
+}
+
+model Campaign {
+  id             String @id @default(cuid())
+  organizationId String
+  clientId       String
+
+  platform  AdPlatform
+  name      String
+  objective String?
+  status    CampaignStatus @default(ATIVA)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  ads          Ad[]
+  metrics      PerformanceMetric[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@map("campaigns")
+}
+
+model Ad {
+  id             String @id @default(cuid())
+  organizationId String
+  clientId       String
+  campaignId     String
+
+  platform AdPlatform
+  name     String
+  status   CampaignStatus @default(ATIVA)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  metrics      PerformanceMetric[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([campaignId])
+  @@map("ads")
+}
+
+/// Linha diária de métricas brutas. Pode ser no nível do cliente (campaignId
+/// e adId nulos — ex: totais de Social/Analytics), de campanha, ou de
+/// anúncio. Métricas derivadas (CTR, CPC, CPL, CPA, ROAS) são sempre
+/// calculadas em runtime a partir destes campos — nunca armazenadas, para
+/// não ficarem dessincronizadas.
+model PerformanceMetric {
+  id             String  @id @default(cuid())
+  organizationId String
+  clientId       String
+  campaignId     String?
+  adId           String?
+
+  platform AdPlatform
+  date     DateTime // granularidade diária (hora zerada)
+
+  investment  Decimal @db.Decimal(12, 2)
+  reach       Int     @default(0)
+  impressions Int     @default(0)
+  clicks      Int     @default(0)
+  leads       Int     @default(0)
+  sales       Int     @default(0)
+  revenue     Decimal @default(0) @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  ad           Ad?          @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId, date])
+  @@index([campaignId])
+  @@index([adId])
+  @@map("performance_metrics")
+}
+
+model SocialPost {
+  id             String @id @default(cuid())
+  organizationId String
+  clientId       String
+
+  platform    SocialPlatform
+  type        SocialContentType
+  caption     String?
+  publishedAt DateTime
+
+  reach    Int @default(0)
+  likes    Int @default(0)
+  comments Int @default(0)
+  shares   Int @default(0)
+  saves    Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  engagements  SocialEngagement[]
+
+  @@index([organizationId])
+  @@index([clientId, publishedAt])
+  @@map("social_posts")
+}
+
+/// Interação individual num post — dado OPCIONAL: a fonte externa nem
+/// sempre devolve identificação de usuário. Quando não existir, o ranking
+/// de "usuários mais engajados" simplesmente não é exibido para o post/
+/// cliente (nunca inventar usuários).
+model SocialEngagement {
+  id             String @id @default(cuid())
+  organizationId String
+  postId         String
+
+  userIdentifier   String // ex: "@usuario01"
+  interactionCount Int
+  engagementSource String // origem do dado, ex: "instagram_insights_mock"
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  post         SocialPost   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([postId])
+  @@map("social_engagements")
+}
+
+model Report {
+  id             String @id @default(cuid())
+  organizationId String
+  clientId       String
+
+  title       String
+  periodStart DateTime
+  periodEnd   DateTime
+  platforms   AdPlatform[]
+  status      ReportStatus @default(RASCUNHO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sections     ReportSection[]
+  metrics      ReportMetric[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@map("reports")
+}
+
+/// Seção do relatório e sua ordem de exibição (arrastável na UI).
+model ReportSection {
+  id       String @id @default(cuid())
+  reportId String
+
+  key     String // "resumo" | "meta_ads" | "google_ads" | "funil" | "campanhas" | "anuncios" | "social_media" | "insights" | "conclusao"
+  order   Int     @default(0)
+  enabled Boolean @default(true)
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, key])
+  @@index([reportId])
+  @@map("report_sections")
+}
+
+/// Métrica configurável incluída no relatório (checkbox da etapa 21).
+model ReportMetric {
+  id       String @id @default(cuid())
+  reportId String
+
+  key     String // "investimento" | "alcance" | "roas" | ...
+  enabled Boolean @default(true)
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, key])
+  @@index([reportId])
+  @@map("report_metrics")
 }
