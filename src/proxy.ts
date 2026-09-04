@@ -35,5 +35,5 @@ export const config = {
   // servido de /public (extensão no final do caminho — ex: /brand/logo.png,
   // favicon.ico, icon.png). Sem isso, o proxy tentava "proteger" imagens
   // públicas e as redirecionava para /login quando não autenticado.
-  matcher: ["/((?!api/auth|api/debug-env|_next/static|_next/image|.*\\.[^/]+$).*)"],
+  matcher: ["/((?!api/auth|_next/static|_next/image|.*\\.[^/]+$).*)"],
 };
