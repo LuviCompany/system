@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     if (error instanceof UserInactiveError) {
       return NextResponse.json({ error: error.message }, { status: 403 });
     }
+    console.error("[login] erro inesperado ao autenticar:", error);
     return NextResponse.json({ error: "Não foi possível autenticar. Tente novamente." }, { status: 500 });
   }
 }
