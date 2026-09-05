@@ -191,26 +191,28 @@ export async function seedClientes(organizationId: string, responsaveis: User[])
     });
     clientCount += 1;
 
-    // Conexões — Meta Ads e Google Ads conectados (temos dados de campanha),
-    // Instagram conectado (temos posts), Google Analytics não conectado nesta etapa.
-    // GOOGLE_ADS não entra aqui de propósito: desde a etapa 5 essa linha da
-    // tabela client_platforms carrega o estado de uma conexão OAuth real
-    // (tokens, externalAccountId) — o seed nunca deve fingir "Conectado" nem
-    // sobrescrever uma conexão real ao rodar de novo. As campanhas/métricas
-    // mock de Google Ads destes clientes de demonstração continuam existindo
-    // normalmente (ver CAMPAIGN_DEFS abaixo), só o status de conexão que
-    // fica honesto: "Não conectado" até alguém passar pelo OAuth de verdade.
-    const platformSeeds: { platform: "META_ADS" | "INSTAGRAM" | "GOOGLE_ANALYTICS"; status: "CONECTADO" | "NAO_CONECTADO"; accountLabel: string | null }[] = [
-      { platform: "META_ADS", status: "CONECTADO", accountLabel: `Conta Meta — ${def.tradeName}` },
-      { platform: "INSTAGRAM", status: "CONECTADO", accountLabel: def.instagram },
+    // Conexões — GOOGLE_ADS, META_ADS e INSTAGRAM nunca são marcados
+    // "Conectado" pelo seed (etapas 5 e 6): essa linha da tabela
+    // client_platforms agora carrega o estado de uma conexão OAuth real
+    // (tokens, externalAccountId) para essas três plataformas — o seed
+    // nunca deve fingir "Conectado" nem sobrescrever uma conexão real ao
+    // rodar de novo. As campanhas/anúncios/posts mock destes clientes de
+    // demonstração continuam existindo normalmente (ver CAMPAIGN_DEFS e
+    // SOCIAL_CONTENT abaixo) — só o status de conexão que fica honesto:
+    // "Não conectado" até alguém passar pelo OAuth de verdade.
+    const platformSeeds: { platform: "GOOGLE_ANALYTICS"; status: "NAO_CONECTADO"; accountLabel: string | null }[] = [
       { platform: "GOOGLE_ANALYTICS", status: "NAO_CONECTADO", accountLabel: null },
     ];
 
-    // Limpa qualquer resquício de "GOOGLE_ADS: CONECTADO" mock de execuções
-    // anteriores do seed (antes da etapa 5) — nunca mexe numa conexão real
-    // (que sempre tem externalAccountId preenchido).
+    // Limpa qualquer resquício de "CONECTADO" mock de execuções anteriores
+    // do seed (antes das etapas 5/6) — nunca mexe numa conexão real (que
+    // sempre tem externalAccountId preenchido).
     await prisma.clientPlatform.deleteMany({
-      where: { clientId: client.id, platform: "GOOGLE_ADS", externalAccountId: null },
+      where: {
+        clientId: client.id,
+        platform: { in: ["GOOGLE_ADS", "META_ADS", "INSTAGRAM"] },
+        externalAccountId: null,
+      },
     });
 
     for (const p of platformSeeds) {
@@ -223,7 +225,7 @@ export async function seedClientes(organizationId: string, responsaveis: User[])
           platform: p.platform,
           status: p.status,
           accountLabel: p.accountLabel,
-          connectedAt: p.status === "CONECTADO" ? dayAt(90) : null,
+          connectedAt: null,
         },
       });
     }
