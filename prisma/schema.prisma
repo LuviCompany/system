@@ -587,6 +587,8 @@ enum IntegrationPlatform {
 enum IntegrationStatus {
   NAO_CONECTADO
   CONECTADO
+  SINCRONIZANDO
+  ERRO
 }
 
 /// Plataforma de mídia paga de uma campanha/anúncio/métrica.
@@ -659,6 +661,13 @@ model Client {
 /// Status de conexão de um cliente com uma plataforma (Meta Ads, Google
 /// Ads, Instagram, Google Analytics). Nesta etapa não há OAuth real — só
 /// a interface e o dado de status ficam prontos.
+/// Conexão de um Client com uma plataforma de integração (etapa 5 — Google Ads).
+/// `accessTokenEncrypted`/`refreshTokenEncrypted` NUNCA guardam o token em
+/// texto puro — são sempre o retorno de `encryptToken()` (ver
+/// src/server/security/token-crypto.ts, AES-256-GCM). Ler o token real exige
+/// passar pelo `connection.service.ts` correspondente da integração, que é o
+/// único lugar autorizado a chamar `decryptToken()`. Nunca selecionar essas
+/// colunas para enviar ao cliente (frontend) nem para logs.
 model ClientPlatform {
   id             String @id @default(cuid())
   organizationId String
@@ -668,6 +677,22 @@ model ClientPlatform {
   status       IntegrationStatus   @default(NAO_CONECTADO)
   accountLabel String?
   connectedAt  DateTime?
+
+  /// Id da conta na plataforma externa (ex: Google Ads Customer ID, sem hífens).
+  externalAccountId String?
+
+  /// Tokens OAuth — sempre criptografados em repouso (ver comentário do model).
+  accessTokenEncrypted  String?   @db.Text
+  refreshTokenEncrypted String?   @db.Text
+  tokenExpiresAt        DateTime?
+
+  /// Dados auxiliares não sensíveis (ex: nome da conta, moeda, login-customer-id
+  /// de um MCC). Nunca guardar token aqui.
+  metadata Json?
+
+  lastSyncAt     DateTime?
+  lastSyncStatus String?
+  lastSyncError  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -690,6 +715,11 @@ model Campaign {
   objective String?
   status    CampaignStatus @default(ATIVA)
 
+  /// Id da campanha na plataforma externa (ex: Google Ads campaign.id) — usado
+  /// para casar (upsert) o registro a cada sincronização. Nulo para campanhas
+  /// de demonstração (seed mock).
+  externalId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -698,6 +728,7 @@ model Campaign {
   ads          Ad[]
   metrics      PerformanceMetric[]
 
+  @@unique([clientId, platform, externalId])
   @@index([organizationId])
   @@index([clientId])
   @@map("campaigns")
@@ -713,6 +744,12 @@ model Ad {
   name     String
   status   CampaignStatus @default(ATIVA)
 
+  /// Id do anúncio na plataforma externa — usado para upsert a cada sincronização.
+  externalId        String?
+  /// Nome do grupo de anúncios (ex: Google Ads ad group) — exibido na tabela de anúncios.
+  adGroupName       String?
+  adGroupExternalId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -721,6 +758,7 @@ model Ad {
   campaign     Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   metrics      PerformanceMetric[]
 
+  @@unique([clientId, platform, externalId])
   @@index([organizationId])
   @@index([clientId])
   @@index([campaignId])

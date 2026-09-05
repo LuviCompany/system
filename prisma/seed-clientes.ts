@@ -63,56 +63,56 @@ const CLIENT_DEFS: ClientSeedDef[] = [
     trend: 0.18,
   },
   {
-    slug: "vitta-odonto",
-    name: "Vitta Odontologia Especializada Ltda",
-    tradeName: "Vitta Odontologia",
-    segment: "Saúde",
+    slug: "galdora-store",
+    name: "Galdora Store Comércio Ltda",
+    tradeName: "Galdora Store",
+    segment: "E-commerce",
     cnpj: "23.456.789/0001-01",
-    website: "https://www.vittaodonto.com.br",
-    instagram: "@vittaodonto",
-    email: "contato@vittaodonto.com.br",
+    website: "https://www.galdorastore.com.br",
+    instagram: "@galdorastore",
+    email: "contato@galdorastore.com.br",
     phone: "(31) 4002-1002",
     baseInvestmentPerDay: 260,
     baseRoas: 3.2,
     trend: 0.05,
   },
   {
-    slug: "sabor-caseiro",
-    name: "Sabor Caseiro Alimentos Ltda",
-    tradeName: "Sabor Caseiro",
-    segment: "Alimentício",
+    slug: "pn-provedor",
+    name: "PN Provedor de Internet Ltda",
+    tradeName: "PN Provedor",
+    segment: "Serviços",
     cnpj: "34.567.890/0001-12",
-    website: "https://www.saborcaseiro.com.br",
-    instagram: "@saborcaseiro",
-    email: "contato@saborcaseiro.com.br",
+    website: "https://www.pnprovedor.com.br",
+    instagram: "@pnprovedor",
+    email: "contato@pnprovedor.com.br",
     phone: "(81) 4002-1003",
     baseInvestmentPerDay: 180,
     baseRoas: 2.6,
     trend: -0.22,
   },
   {
-    slug: "viva-bem-academia",
-    name: "Viva Bem Academia e Estúdio Ltda",
-    tradeName: "Viva Bem Academia",
-    segment: "Fitness",
+    slug: "colegio-casi",
+    name: "Colégio CASI Educação Ltda",
+    tradeName: "Colégio Casi",
+    segment: "Educação",
     cnpj: "45.678.901/0001-23",
-    website: "https://www.vivabemacademia.com.br",
-    instagram: "@vivabemacademia",
-    email: "contato@vivabemacademia.com.br",
+    website: "https://www.colegiocasi.com.br",
+    instagram: "@colegiocasi",
+    email: "contato@colegiocasi.com.br",
     phone: "(48) 4002-1004",
     baseInvestmentPerDay: 210,
     baseRoas: 3.8,
     trend: 0.12,
   },
   {
-    slug: "bella-vista-imoveis",
-    name: "Bella Vista Imóveis Ltda",
-    tradeName: "Bella Vista Imóveis",
-    segment: "Imobiliário",
+    slug: "thg-modas",
+    name: "THG Modas Comércio de Roupas Ltda",
+    tradeName: "THG Modas",
+    segment: "Moda",
     cnpj: "56.789.012/0001-34",
-    website: "https://www.bellavistaimoveis.com.br",
-    instagram: "@bellavistaimoveis",
-    email: "contato@bellavistaimoveis.com.br",
+    website: "https://www.thgmodas.com.br",
+    instagram: "@thgmodas",
+    email: "contato@thgmodas.com.br",
     phone: "(11) 4002-1005",
     baseInvestmentPerDay: 560,
     baseRoas: 5.1,
@@ -143,6 +143,14 @@ export async function seedClientes(organizationId: string, responsaveis: User[])
   let metricCount = 0;
   let postCount = 0;
   let reportCount = 0;
+
+  // Remove clientes de demonstração de execuções anteriores do seed que não
+  // fazem mais parte de CLIENT_DEFS (ex: troca da lista de clientes de teste).
+  // Cascade apaga junto plataformas/campanhas/anúncios/métricas/posts/relatórios.
+  const currentSeedIds = CLIENT_DEFS.map((def) => `seed-client-${def.slug}`);
+  await prisma.client.deleteMany({
+    where: { organizationId, id: { startsWith: "seed-client-", not: { in: currentSeedIds } } },
+  });
 
   for (let clientIndex = 0; clientIndex < CLIENT_DEFS.length; clientIndex += 1) {
     const def = CLIENT_DEFS[clientIndex];
@@ -185,12 +193,26 @@ export async function seedClientes(organizationId: string, responsaveis: User[])
 
     // Conexões — Meta Ads e Google Ads conectados (temos dados de campanha),
     // Instagram conectado (temos posts), Google Analytics não conectado nesta etapa.
-    const platformSeeds: { platform: "META_ADS" | "GOOGLE_ADS" | "INSTAGRAM" | "GOOGLE_ANALYTICS"; status: "CONECTADO" | "NAO_CONECTADO"; accountLabel: string | null }[] = [
+    // GOOGLE_ADS não entra aqui de propósito: desde a etapa 5 essa linha da
+    // tabela client_platforms carrega o estado de uma conexão OAuth real
+    // (tokens, externalAccountId) — o seed nunca deve fingir "Conectado" nem
+    // sobrescrever uma conexão real ao rodar de novo. As campanhas/métricas
+    // mock de Google Ads destes clientes de demonstração continuam existindo
+    // normalmente (ver CAMPAIGN_DEFS abaixo), só o status de conexão que
+    // fica honesto: "Não conectado" até alguém passar pelo OAuth de verdade.
+    const platformSeeds: { platform: "META_ADS" | "INSTAGRAM" | "GOOGLE_ANALYTICS"; status: "CONECTADO" | "NAO_CONECTADO"; accountLabel: string | null }[] = [
       { platform: "META_ADS", status: "CONECTADO", accountLabel: `Conta Meta — ${def.tradeName}` },
-      { platform: "GOOGLE_ADS", status: "CONECTADO", accountLabel: `Conta Google Ads — ${def.tradeName}` },
       { platform: "INSTAGRAM", status: "CONECTADO", accountLabel: def.instagram },
       { platform: "GOOGLE_ANALYTICS", status: "NAO_CONECTADO", accountLabel: null },
     ];
+
+    // Limpa qualquer resquício de "GOOGLE_ADS: CONECTADO" mock de execuções
+    // anteriores do seed (antes da etapa 5) — nunca mexe numa conexão real
+    // (que sempre tem externalAccountId preenchido).
+    await prisma.clientPlatform.deleteMany({
+      where: { clientId: client.id, platform: "GOOGLE_ADS", externalAccountId: null },
+    });
+
     for (const p of platformSeeds) {
       await prisma.clientPlatform.upsert({
         where: { clientId_platform: { clientId: client.id, platform: p.platform } },

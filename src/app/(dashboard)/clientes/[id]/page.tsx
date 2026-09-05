@@ -97,6 +97,9 @@ export default async function ClienteDashboardPage({ params, searchParams }: Pag
         <div className="flex items-center gap-2">
           <PeriodSelector value={preset} />
           <Button variant="outline" asChild>
+            <Link href={`/clientes/${client.id}/google-ads`}>Google Ads</Link>
+          </Button>
+          <Button variant="outline" asChild>
             <Link href={`/clientes/${client.id}/integracoes`}>Integrações</Link>
           </Button>
           <EditClientDrawer

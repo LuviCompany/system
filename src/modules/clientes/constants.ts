@@ -42,6 +42,16 @@ export const INTEGRATION_PLATFORM_LABELS: Record<IntegrationPlatform, string> = 
 export const INTEGRATION_STATUS_LABELS: Record<IntegrationStatus, string> = {
   CONECTADO: "Conectado",
   NAO_CONECTADO: "Não conectado",
+  SINCRONIZANDO: "Sincronizando",
+  ERRO: "Erro",
+};
+
+/** Ícone/emoji de status (etapa 17 do módulo Google Ads). */
+export const INTEGRATION_STATUS_ICON: Record<IntegrationStatus, string> = {
+  CONECTADO: "🟢",
+  SINCRONIZANDO: "🟡",
+  ERRO: "🔴",
+  NAO_CONECTADO: "⚪",
 };
 
 export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {

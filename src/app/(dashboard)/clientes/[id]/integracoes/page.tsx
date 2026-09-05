@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { GoogleAdsIntegrationCard } from "@/components/clientes/google-ads-integration-card";
 import { IntegrationCard } from "@/components/clientes/integration-card";
 import { INTEGRATION_PLATFORM_LABELS } from "@/modules/clientes/constants";
 import { requireSession } from "@/server/auth/session";
 import { getClientById } from "@/server/clients/client.service";
+import { getGoogleAdsConnection } from "@/server/integrations/google-ads/connection.service";
 
 export const metadata: Metadata = { title: "Integrações do cliente" };
 
@@ -20,18 +22,22 @@ export default async function ClienteIntegracoesPage({ params }: PageProps) {
   const client = await getClientById(session.organizationId, id);
   if (!client) notFound();
 
+  const googleAdsConnection = await getGoogleAdsConnection(session.organizationId, id);
+  const mockPlatforms = PLATFORMS.filter((platform) => platform !== "GOOGLE_ADS");
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-ink-900">Integrações — {client.tradeName ?? client.name}</h1>
         <p className="text-sm text-ink-500">
-          Status de conexão com cada plataforma. Nesta etapa não há autorização (OAuth) real — a interface já está pronta para
-          receber a conexão de fato em uma próxima etapa.
+          Google Ads já é uma conexão real via OAuth 2.0 (somente leitura). As demais plataformas ainda são apenas visuais nesta
+          etapa — a interface já está pronta para receber a conexão de fato.
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {PLATFORMS.map((platform) => {
+        <GoogleAdsIntegrationCard clientId={client.id} connection={googleAdsConnection} />
+        {mockPlatforms.map((platform) => {
           const connection = client.platforms.find((p) => p.platform === platform);
           return (
             <IntegrationCard
