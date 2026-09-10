@@ -8,6 +8,7 @@ import type {
   SocialMediaProvider,
 } from "@/server/integrations/social-media-provider";
 
+import { META_INSTAGRAM_OAUTH_SCOPES } from "../config";
 import { MetaError } from "../errors";
 import { buildMetaAuthUrl, exchangeCodeForTokens, revokeToken } from "../oauth";
 import { fetchTopEngagedUsers as fetchTopEngagedUsersStub } from "./engagement";
@@ -21,7 +22,7 @@ export class InstagramProvider implements SocialMediaProvider {
   readonly platform: SocialPlatform = "INSTAGRAM";
 
   buildAuthUrl(state: string): string {
-    return buildMetaAuthUrl(state);
+    return buildMetaAuthUrl(state, META_INSTAGRAM_OAUTH_SCOPES);
   }
 
   async exchangeCodeForTokens(code: string): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: Date | null }> {

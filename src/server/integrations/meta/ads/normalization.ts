@@ -1,71 +1,51 @@
 import type { NormalizedAdMetric, NormalizedCampaignMetric } from "@/server/integrations/ads-provider";
 
-import type { MetaInsightsRow } from "./reporting";
+import type { MetaInsightsRow } from "./client";
 
 /**
- * Converte uma linha bruta de `/insights` da Meta Marketing API para o
- * mesmo modelo interno usado pelo Google Ads (`NormalizedCampaignMetric`/
- * `NormalizedAdMetric` — ver server/integrations/ads-provider.ts). Isso é o
- * que permite o dashboard e o relatório tratarem Google Ads e Meta Ads de
- * forma idêntica sem saber qual plataforma originou o dado.
- *
- * Diferente do Google (que devolve tudo em "micros"), a Meta já devolve
- * `spend`/`action_values` na moeda real da conta — não há conversão a
- * fazer aqui, só parsing de string para número.
- *
- * Não implementado de fato nesta etapa (não há linha real para normalizar
- * ainda — `meta/ads/reporting.ts` nunca é alcançado). Mantido como
- * scaffold para deixar claro o mapeamento de campos esperado.
+ * Converte uma linha de Insights (spend já na moeda da conta, nunca em
+ * micros) para o modelo interno. IMPORTANTE: `conversions`/`conversionValue`
+ * ficam sempre em 0 nesta etapa — a Meta não tem um campo único
+ * "conversions" como o Google (`metrics.conversions`); o dado real está
+ * espalhado num array `actions[]` com dezenas de tipos de evento possíveis
+ * (lead, purchase, onsite_conversion.*, ...), e qual(is) tipo(s) contar
+ * como conversão é uma decisão de negócio que não foi especificada — não
+ * inventamos esse número. impressions/clicks/spend são inequívocos e vêm
+ * reais. Ver docs/meta-ads.md para revisitar isso numa próxima etapa.
  */
 
-interface RawCampaignInsightsRow {
-  campaign_id?: string;
-  campaign_name?: string;
-  spend?: string;
-  impressions?: string;
-  clicks?: string;
-  actions?: { action_type: string; value: string }[];
-  action_values?: { action_type: string; value: string }[];
-  date_start?: string;
-}
-
-export function normalizeCampaignRow(row: MetaInsightsRow): NormalizedCampaignMetric | null {
-  const raw = row as RawCampaignInsightsRow;
-  if (!raw.campaign_id || !raw.date_start) return null;
-
-  const conversions = sumActionValues(raw.actions);
-  const conversionValue = sumActionValues(raw.action_values);
-
-  return {
-    externalCampaignId: raw.campaign_id,
-    campaignName: raw.campaign_name ?? `Campanha ${raw.campaign_id}`,
-    campaignStatus: "ACTIVE",
-    date: new Date(raw.date_start),
-    impressions: Number(raw.impressions ?? 0),
-    clicks: Number(raw.clicks ?? 0),
-    spend: Number(raw.spend ?? 0),
-    conversions,
-    conversionValue,
-  };
-}
-
-interface RawAdInsightsRow {
+interface RawInsightsRow {
   campaign_id?: string;
   campaign_name?: string;
   adset_id?: string;
   adset_name?: string;
   ad_id?: string;
   ad_name?: string;
-  spend?: string;
-  impressions?: string;
-  clicks?: string;
-  actions?: { action_type: string; value: string }[];
-  action_values?: { action_type: string; value: string }[];
   date_start?: string;
+  impressions?: string | number;
+  clicks?: string | number;
+  spend?: string | number;
+}
+
+export function normalizeCampaignRow(row: MetaInsightsRow, statusByCampaignId: Map<string, string>): NormalizedCampaignMetric | null {
+  const raw = row as RawInsightsRow;
+  if (!raw.campaign_id || !raw.date_start) return null;
+
+  return {
+    externalCampaignId: raw.campaign_id,
+    campaignName: raw.campaign_name ?? `Campanha ${raw.campaign_id}`,
+    campaignStatus: statusByCampaignId.get(raw.campaign_id) ?? "UNKNOWN",
+    date: new Date(raw.date_start),
+    impressions: Number(raw.impressions ?? 0),
+    clicks: Number(raw.clicks ?? 0),
+    spend: Number(raw.spend ?? 0),
+    conversions: 0,
+    conversionValue: 0,
+  };
 }
 
 export function normalizeAdRow(row: MetaInsightsRow): NormalizedAdMetric | null {
-  const raw = row as RawAdInsightsRow;
+  const raw = row as RawInsightsRow;
   if (!raw.campaign_id || !raw.adset_id || !raw.ad_id || !raw.date_start) return null;
 
   return {
@@ -79,12 +59,7 @@ export function normalizeAdRow(row: MetaInsightsRow): NormalizedAdMetric | null 
     impressions: Number(raw.impressions ?? 0),
     clicks: Number(raw.clicks ?? 0),
     spend: Number(raw.spend ?? 0),
-    conversions: sumActionValues(raw.actions),
-    conversionValue: sumActionValues(raw.action_values),
+    conversions: 0,
+    conversionValue: 0,
   };
-}
-
-function sumActionValues(actions: { action_type: string; value: string }[] | undefined): number {
-  if (!actions) return 0;
-  return actions.reduce((sum, action) => sum + Number(action.value || 0), 0);
 }

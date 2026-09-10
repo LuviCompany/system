@@ -22,16 +22,17 @@ interface MetaIntegrationCardProps {
 }
 
 /**
- * Card de integração para Meta Ads / Instagram (etapa 6 — arquitetura
- * preparada, sem OAuth real). Mesma estrutura visual do card do Google Ads,
- * mas o botão "Conectar" sempre volta com "não configurado" nesta etapa —
- * nunca mostra "Conectado" para o status mock herdado do seed (item 16).
+ * Card de integração para Meta Ads / Instagram. Meta Ads é uma conexão real
+ * (etapa 7, somente ads_read). Instagram continua com a arquitetura pronta
+ * mas explicitamente não implementado — nunca mostra "Conectado" para o
+ * status mock herdado do seed, e não depende de isMetaConfigured() (que a
+ * partir de agora reflete só as credenciais de Meta Ads).
  */
 export function MetaIntegrationCard({ clientId, platform, label, connection }: MetaIntegrationCardProps) {
+  const isInstagram = platform === "INSTAGRAM";
   const configured = isMetaConfigured();
   const genuinelyConnected = isGenuinelyConnected(connection);
   const status = genuinelyConnected ? connection!.status : "NAO_CONECTADO";
-  const connectScope = platform === "META_ADS" ? "ads" : "instagram";
 
   return (
     <Card>
@@ -44,11 +45,15 @@ export function MetaIntegrationCard({ clientId, platform, label, connection }: M
         </Badge>
       </CardHeader>
       <CardContent className="space-y-3">
-        {!configured && (
-          <p className="text-xs text-ink-400">
-            Arquitetura preparada para OAuth real nesta etapa — ainda sem credenciais configuradas
-            {listMissingMetaEnvVars().length > 0 ? ` (${listMissingMetaEnvVars().join(", ")})` : ""}.
-          </p>
+        {isInstagram ? (
+          <p className="text-xs text-ink-400">Arquitetura pronta — implementação prevista para uma próxima etapa.</p>
+        ) : (
+          !configured && (
+            <p className="text-sm text-danger-600">
+              Integração ainda não configurada nesta instalação — faltam variáveis de ambiente
+              {listMissingMetaEnvVars().length > 0 ? ` (${listMissingMetaEnvVars().join(", ")})` : ""}. Ver <code>docs/meta-ads.md</code>.
+            </p>
+          )
         )}
 
         {genuinelyConnected && (
@@ -59,18 +64,25 @@ export function MetaIntegrationCard({ clientId, platform, label, connection }: M
         )}
         {status === "ERRO" && connection?.lastSyncError && <p className="text-sm text-danger-600">{connection.lastSyncError}</p>}
 
-        <div className="flex flex-wrap gap-2">
-          {!genuinelyConnected ? (
-            <Button variant="outline" asChild>
-              <Link href={`/api/integrations/meta/connect?clientId=${clientId}&platform=${connectScope}`}>Conectar</Link>
-            </Button>
-          ) : (
-            <>
-              <SyncMetaButton clientId={clientId} platform={platform} />
-              <DisconnectMetaButton clientId={clientId} platform={platform} />
-            </>
-          )}
-        </div>
+        {!isInstagram && (
+          <div className="flex flex-wrap gap-2">
+            {!genuinelyConnected ? (
+              configured && (
+                <Button variant="outline" asChild>
+                  <Link href={`/api/integrations/meta/connect?clientId=${clientId}&platform=ads`}>Conectar Meta Ads</Link>
+                </Button>
+              )
+            ) : (
+              <>
+                <SyncMetaButton clientId={clientId} platform={platform} />
+                <Button variant="outline" asChild>
+                  <Link href={`/clientes/${clientId}/meta-ads`}>Ver dashboard</Link>
+                </Button>
+                <DisconnectMetaButton clientId={clientId} platform={platform} />
+              </>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

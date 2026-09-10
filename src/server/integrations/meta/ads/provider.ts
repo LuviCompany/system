@@ -2,45 +2,51 @@ import type { AdPlatform } from "@prisma/client";
 
 import type { AccessibleAccount, AdsProvider, FetchReportParams, NormalizedAdMetric, NormalizedCampaignMetric, OAuthTokenSet } from "@/server/integrations/ads-provider";
 
-import { MetaError } from "../errors";
-import { buildMetaAuthUrl, exchangeCodeForTokens, revokeToken } from "../oauth";
+import { META_ADS_OAUTH_SCOPES } from "../config";
+import { buildMetaAuthUrl, exchangeCodeForTokens, refreshAccessToken, revokeToken } from "../oauth";
+import { fetchCampaignStatuses, listAdAccounts } from "./client";
 import { normalizeAdRow, normalizeCampaignRow } from "./normalization";
 import { fetchRawAdInsights, fetchRawCampaignInsights } from "./reporting";
 
-/**
- * Implementação de AdsProvider para Meta Ads — espelha exatamente a forma
- * de server/integrations/google-ads/provider.ts (mesma interface,
- * implementação isolada). Etapa 6: toda chamada real cai em `oauth.ts`/
- * `client.ts`, que lançam `NOT_CONFIGURED` de propósito (item 20 — nenhum
- * OAuth ou chamada real à API da Meta nesta etapa).
- */
+function stripAdAccountPrefix(id: string): string {
+  return id.startsWith("act_") ? id.slice(4) : id;
+}
+
+/** Implementação de AdsProvider para Meta Ads (etapa 7 — somente leitura, somente ads_read). */
 export class MetaAdsProvider implements AdsProvider {
   readonly platform: AdPlatform = "META_ADS";
 
   buildAuthUrl(state: string): string {
-    return buildMetaAuthUrl(state);
+    return buildMetaAuthUrl(state, META_ADS_OAUTH_SCOPES);
   }
 
   async exchangeCodeForTokens(code: string): Promise<OAuthTokenSet> {
-    await exchangeCodeForTokens(code);
-    throw new MetaError("NOT_CONFIGURED", "Meta Ads ainda não implementado.");
+    return exchangeCodeForTokens(code);
   }
 
-  async refreshAccessToken(): Promise<OAuthTokenSet> {
-    throw new MetaError("NOT_CONFIGURED", "Renovação de token do Meta Ads ainda não implementada.");
+  async refreshAccessToken(currentAccessToken: string): Promise<OAuthTokenSet> {
+    return refreshAccessToken(currentAccessToken);
   }
 
   async revokeToken(token: string): Promise<void> {
     return revokeToken(token);
   }
 
-  async listAccessibleAccounts(): Promise<AccessibleAccount[]> {
-    throw new MetaError("NOT_CONFIGURED", "Listagem de contas do Meta Ads ainda não implementada.");
+  async listAccessibleAccounts(accessToken: string): Promise<AccessibleAccount[]> {
+    const accounts = await listAdAccounts(accessToken);
+    return accounts.map((account) => ({
+      externalAccountId: stripAdAccountPrefix(account.id),
+      name: account.name ?? null,
+      currencyCode: account.currency ?? null,
+    }));
   }
 
   async fetchCampaignMetrics(params: FetchReportParams): Promise<NormalizedCampaignMetric[]> {
-    const rows = await fetchRawCampaignInsights({ externalAccountId: params.externalAccountId, accessToken: params.accessToken, period: params.period });
-    return rows.map(normalizeCampaignRow).filter((row): row is NormalizedCampaignMetric => row !== null);
+    const [rows, statusByCampaignId] = await Promise.all([
+      fetchRawCampaignInsights({ externalAccountId: params.externalAccountId, accessToken: params.accessToken, period: params.period }),
+      fetchCampaignStatuses(params.externalAccountId, params.accessToken),
+    ]);
+    return rows.map((row) => normalizeCampaignRow(row, statusByCampaignId)).filter((row): row is NormalizedCampaignMetric => row !== null);
   }
 
   async fetchAdMetrics(params: FetchReportParams): Promise<NormalizedAdMetric[]> {

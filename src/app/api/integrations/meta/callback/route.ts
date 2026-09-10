@@ -8,11 +8,10 @@ import { exchangeCodeForTokens } from "@/server/integrations/meta/oauth";
 import { verifyMetaOAuthState } from "@/server/integrations/meta/state";
 
 /**
- * Callback OAuth da Meta — nunca é alcançado de fato nesta etapa (o botão
- * "Conectar" já para antes, em /api/integrations/meta/connect, com o erro
- * "não configurado"). Implementado mesmo assim para a arquitetura ficar
- * completa e pronta (item 20 pede só para NÃO implementar o OAuth real —
- * o encaminhamento e a persistência da conexão já estão prontos).
+ * Callback OAuth da Meta — etapa 7: troca o `code` por tokens reais
+ * (somente para scope "ads"; scope "instagram" nunca chega aqui, pois o
+ * connect route bloqueia antes de gerar um `state` válido) e redireciona
+ * para a seleção de conta de anúncios.
  */
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -49,5 +48,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (state.scope === "ads") {
+    return NextResponse.redirect(new URL(`/clientes/${state.clientId}/integracoes/meta/selecionar-conta`, request.url));
+  }
   return NextResponse.redirect(new URL(fallbackPath, request.url));
 }

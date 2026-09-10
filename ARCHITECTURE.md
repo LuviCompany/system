@@ -90,6 +90,7 @@ Pendências conhecidas (fora do escopo desta etapa, registradas para não serem 
 ## 7. Onde as próximas integrações entram
 
 - **Encontrar Leads**: funcional com um provider mock — ver seção 9. A implementação futura de uma fonte real (Google Places, etc.) entra implementando a interface `SearchProvider` (`src/server/lead-sourcing/types.ts`) e trocando a escolha em `src/server/lead-sourcing/provider.ts`; nenhum outro código muda.
+- **Google Ads e Meta Ads**: ambos já são integrações reais, somente leitura, via OAuth — ver `docs/google-ads.md` e `docs/meta-ads.md`. Instagram e Google Analytics continuam com arquitetura preparada (`AdsProvider`/`SocialMediaProvider`) mas sem implementação real.
 - **Qualificação automática de ICP**: implementada na etapa anterior — ver seção 8. Uma futura IA de qualificação entraria sugerindo valores para os campos que hoje são preenchidos manualmente (`estimatedRevenue`, `adSpend`, `commercialMaturity`...), sem mudar o motor de cálculo em si.
 - **Notificações/e-mail**: `FollowUp` e `Activity` já modelam os eventos que disparariam notificações reais; falta apenas o transporte (e-mail, push).
 

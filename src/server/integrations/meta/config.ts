@@ -3,13 +3,17 @@
  * compartilhado entre Meta Ads e Instagram, já que ambos usam o mesmo OAuth
  * da plataforma Meta, só com escopos diferentes).
  *
- * Etapa 6 é só preparação de arquitetura — nenhuma credencial real é
- * solicitada nem configurada aqui. `isMetaConfigured()` sempre devolve
- * `false` até alguém preencher estas variáveis num ambiente real (próxima
- * etapa, com autorização explícita do usuário).
+ * Etapa 7: Meta Ads passa a ser uma integração real (somente `ads_read`).
+ * Instagram continua como arquitetura preparada, mas NÃO solicita nenhuma
+ * permissão — ver META_INSTAGRAM_OAUTH_SCOPES (definido, não usado ainda) e
+ * o bloqueio explícito em api/integrations/meta/connect/route.ts.
  */
 
-export const META_OAUTH_SCOPES = ["ads_read", "instagram_basic", "instagram_manage_insights", "pages_read_engagement"];
+/** Único escopo pedido nesta etapa — somente leitura de anúncios, sem `ads_management`. */
+export const META_ADS_OAUTH_SCOPES = ["ads_read"];
+
+/** Preparado para quando Instagram for implementado — não é solicitado em nenhum fluxo real nesta etapa. */
+export const META_INSTAGRAM_OAUTH_SCOPES = ["instagram_basic", "instagram_manage_insights", "pages_read_engagement"];
 
 export interface MetaCredentials {
   appId: string;

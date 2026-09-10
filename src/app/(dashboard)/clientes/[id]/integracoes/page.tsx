@@ -17,6 +17,7 @@ const MOCK_PLATFORMS = ["GOOGLE_ANALYTICS"] as const;
 const ERROR_MESSAGES: Record<string, string> = {
   meta_cancelado: "Você cancelou a autorização na Meta.",
   meta_state_invalido: "A sessão de autorização expirou. Tente conectar novamente.",
+  meta_instagram_nao_implementado: "A integração com o Instagram ainda não foi implementada nesta etapa.",
 };
 
 interface PageProps {
@@ -46,8 +47,8 @@ export default async function ClienteIntegracoesPage({ params, searchParams }: P
       <div>
         <h1 className="text-xl font-semibold text-ink-900">Integrações — {client.tradeName ?? client.name}</h1>
         <p className="text-sm text-ink-500">
-          Google Ads já é uma conexão real via OAuth 2.0 (somente leitura). Meta Ads e Instagram têm a arquitetura pronta para OAuth
-          real, mas ainda sem credenciais configuradas nesta instalação. Google Analytics segue apenas visual.
+          Google Ads e Meta Ads já são conexões reais via OAuth (somente leitura). Instagram tem a arquitetura pronta, mas sua
+          implementação fica para uma próxima etapa. Google Analytics segue apenas visual.
         </p>
       </div>
 
