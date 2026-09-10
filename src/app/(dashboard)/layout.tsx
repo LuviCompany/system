@@ -3,12 +3,14 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { requireSession } from "@/server/auth/session";
 import { listTodayAndOverdueFollowUps } from "@/server/followups/followup.service";
 import { getOrganization } from "@/server/org/org.service";
+import { getServerSidebarCollapsed } from "@/server/sidebar/sidebar.service";
 
 export default async function DashboardGroupLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
-  const [organization, followUps] = await Promise.all([
+  const [organization, followUps, sidebarCollapsed] = await Promise.all([
     getOrganization(session.organizationId),
     listTodayAndOverdueFollowUps(session.organizationId, session),
+    getServerSidebarCollapsed(),
   ]);
 
   const notifications = [
@@ -18,7 +20,7 @@ export default async function DashboardGroupLayout({ children }: { children: Rea
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas">
-      <Sidebar />
+      <Sidebar defaultCollapsed={sidebarCollapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
           organizationName={organization.name}

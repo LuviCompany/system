@@ -37,7 +37,7 @@ export function Logo({ className, markClassName }: { className?: string; markCla
       <LogoMark className={markClassName} />
       <span className="leading-tight">
         <span className="block text-sm font-semibold text-chrome-fg">LUVI</span>
-        <span className="block text-[11px] text-chrome-fg-muted">CRM</span>
+        <span className="block text-[11px] tracking-wide text-chrome-fg-muted">SYSTEM</span>
       </span>
     </span>
   );

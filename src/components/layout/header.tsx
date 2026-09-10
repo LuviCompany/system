@@ -99,7 +99,7 @@ export function Header({ organizationName, user, notifications }: HeaderProps) {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => router.push("/perfil")}>
               <UserRound className="h-4 w-4" aria-hidden />
               Meu perfil
             </DropdownMenuItem>

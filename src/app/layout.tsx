@@ -18,8 +18,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "LUVI CRM",
-    template: "%s · LUVI CRM",
+    default: "LUVI SYSTEM",
+    template: "%s · LUVI SYSTEM",
   },
   description: "Transforme prospecção em resultado.",
 };

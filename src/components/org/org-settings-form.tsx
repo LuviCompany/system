@@ -55,7 +55,7 @@ export function OrgSettingsForm({ initialName, initialDomain, canEdit }: OrgSett
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="org-platform">Plataforma</Label>
-          <Input id="org-platform" value="LUVI CRM" disabled />
+          <Input id="org-platform" value="LUVI SYSTEM" disabled />
         </div>
       </div>
 

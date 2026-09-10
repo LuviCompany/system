@@ -18,7 +18,7 @@ export default async function ConfiguracoesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-ink-900">Configurações</h1>
-        <p className="text-sm text-ink-500">Dados da sua organização no LUVI CRM.</p>
+        <p className="text-sm text-ink-500">Dados da sua organização no LUVI SYSTEM.</p>
       </div>
 
       <Card>

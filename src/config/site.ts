@@ -20,7 +20,7 @@ import type { LucideIcon } from "lucide-react";
 
 export const siteConfig = {
   name: "LUVI",
-  product: "LUVI CRM",
+  product: "LUVI SYSTEM",
   tagline: "Transforme prospecção em resultado.",
 };
 

@@ -19,7 +19,7 @@ export default async function IntegracoesPage() {
           Configurações
         </Link>
         <h1 className="text-xl font-semibold text-ink-900">Integrações</h1>
-        <p className="text-sm text-ink-500">Fontes externas conectadas ao LUVI CRM.</p>
+        <p className="text-sm text-ink-500">Fontes externas conectadas ao LUVI SYSTEM.</p>
       </div>
 
       <div className="max-w-lg">
